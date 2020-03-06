@@ -1,0 +1,39 @@
+#In this script, The information of the birds and tides is connected to
+#the available images of google earth engine.
+
+#the inputs of this script
+rastlist <- list.files(path = "~/Documents/Bio_informatica/Jaar_3/Bship/TIF_Oman", pattern='local_tidal_level_*', full.names=TRUE)
+source("edit_tables_oman.R")
+library(raster)
+
+number_tif <- function(rastlist){
+  File_numbers<-as.numeric(sapply(strsplit(rastlist, '_'), '[[', i=7))
+}
+
+tiff_plot <- function(rastlist){
+  afbeelding <- raster(rastlist)
+  nummer_afbeelding <- number_tif(rastlist)
+  info <- subset(metadata_images_table, image_number == nummer_afbeelding)
+  birds <- subset(birdlocation_table, z.m. == info$z.m.)
+  if(nrow(birds) != 0){
+    plot(afbeelding)
+    birds <- SpatialPointsDataFrame(data.frame(birds$location.long, birds$location.lat), data.frame(birds))
+    proj4string(birds)=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+    plot(birds, add = T, col = 'red', pch = 16)
+    birds$land <- extract(gebied, birds[,c(1,2)], cellnumbers=F)
+    return(birds)
+  }
+}
+
+lapply(rastlist, tiff_plot)
+
+
+
+
+
+
+
+
+
+
+
