@@ -1,0 +1,34 @@
+#This script will import the different tables that are used for this project
+#The tables will also be edited, so it will be easier to work with them.
+
+
+#input of the script
+library(zoo)
+tides_table <- read.csv("~/Documents/Bio_informatica/Jaar_3/Bship/oman_tides_2016_2020.txt", sep="")
+birdlocation_table <- read.csv("~/Documents/Bio_informatica/Jaar_3/Bship/BarWitsOman_Winter2016.csv")
+metadata_images_table <- read.csv("~/Documents/Bio_informatica/Jaar_3/Bship/TIF_Oman/datetime_table.txt", sep="")
+
+#Making sure all tables have a 'timestamp' collumn that includes the date and time.
+#This will make it easier to give these collumns a timestamp.
+tides_table$timestamp <- paste(tides_table$mm.dd.yyyy, tides_table$hh.mm.ss, sep = ' ')
+metadata_images_table$timestamp <- paste(metadata_images_table$date, metadata_images_table$time, sep = ' ')
+tides_table <- tides_table[, c("Lat","Lon", "timestamp", "z.m.", "Depth.m.")]
+metadata_images_table <- metadata_images_table[, c("image_number", "timestamp")]
+
+#Give all the tables a timestamp This is specific to the minute.
+tides_table <- tides_table[order(tides_table$timestamp),]
+tides_table$timestamp <- strptime(tides_table$time, format='%m.%d.%Y %H:%M', tz = 'UTC')
+birdlocation_table$timestamp <- strptime(birdlocation_table$timestamp, format='%Y-%m-%d %H:%M', tz = 'UTC')
+metadata_images_table$timestamp <- strptime(metadata_images_table$timestamp, format='%Y-%m-%d %H-%M', tz = 'UTC')
+
+#make sure the 'location-bird' table has a location-stamp too.
+positievogel <- SpatialPointsDataFrame(data.frame(birdlocation_table$location.long, birdlocation_table$location.lat), data.frame(birdlocation_table))
+proj4string(positievogel)=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+
+
+#We extract the collumns from tides_table that we want added to the metadata_images_table.
+#the ss_tides_table is merged with the metadata_images_table in a left outer join.
+ss_tides_table <-  tides_table[, c("timestamp", "z.m.")]
+metadata_images_table<- merge(x=metadata_images_table, y=ss_tides_table, by="timestamp", all.x=T, sort=F)
+
+
