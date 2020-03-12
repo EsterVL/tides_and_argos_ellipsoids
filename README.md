@@ -15,3 +15,8 @@ this repository contains code in development
 
 ## combine
 - overlay.. to discuss further...
+
+## current workflow:
+- download the images
+- create a datetime table with the bash script
+- run merge_ndwi_tide_predictions.R
