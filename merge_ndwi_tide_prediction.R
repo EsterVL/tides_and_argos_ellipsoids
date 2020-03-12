@@ -41,15 +41,19 @@ clusterExport(cl, "meters")
 #the calc function itterates through a brickfile by itself, so the forloop was not necessary. 
 #This also helps improve the running time
 brk_ebb <- calc(brk_tiff, fun=function(x){ parApply(cl, x, 1, cross_gam_wrapper_par_ebb)} )
+writeRaster(brk_ebb, 'brk_ebb.grd', overwrite=TRUE)
 brk_flood <- calc(brk_tiff, fun=function(x){ parApply(cl, x, 1, cross_gam_wrapper_par_flow)} )
+writeRaster(brk_flood, 'brk_flood.grd', overwrite=TRUE)
 
 #split the brickfiles of flood and ebb into seperate images
-tiles_Ebb <- splitRaster(brk_Ebb, nx=5, ny=5, )
-tiles_Flood <- splitRaster(brk_Flood, nx=5, ny=5, )
+tiles_Ebb <- splitRaster(brk_ebb, nx=5, ny=5, )
+tiles_Flood <- splitRaster(brk_flood, nx=5, ny=5, )
 
 #tests
-plot(tiles_Ebb[[1]])
-plot(tiles_Ebb[[4]])
-
-tt <- tiles_Ebb[[4]]
-values(tt)
+par(mfrow = c(2,3))
+plot(tiles_Ebb[[1]], main = 'tiles_Ebb[1]')
+plot(tiles_Ebb[[2]], main = 'tiles_Ebb[2]')
+plot(tiles_Ebb[[3]], main = 'tiles_Ebb[3]')
+plot(tiles_Ebb[[4]], main = 'tiles_Ebb[4]')
+plot(tiles_Ebb[[5]], main = 'tiles_Ebb[5]')
+plot(tiles_Ebb[[6]], main = 'tiles_Ebb[6]')
