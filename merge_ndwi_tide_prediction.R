@@ -1,61 +1,55 @@
-
-#With this code you can estimate bathymetry based on NDWI values in your satellite imagery brick
-#and tide level prediction. You have to do it separately for Flow and Ebb phases, 
+#With this code you can estimate bathymetry based on NDWI 
+#values in your satellite imagery brick and tide level prediction. 
+#You have to do it separately for Flow and Ebb phases, 
 #since the patterns of water flow differ between the phases.
-#The objects Ebb and Flow are eventually made
-#For tis you will need to load 
-#1)cross_gam function by Eldar
-#2)your raster brick, 
-#3)dataframe with the list of images, with time
-#4)dataframe with predicted tides (it should also contain tide phase column)
 
+#The inputs for this script 
 library(raster)
 library(rootSolve)
 library(mgcv)
-
-load("tide.RData")
-#tide<-Bubaque_2016_2020
-tide<-tide[order(tide$Time),]
-
-load("Image_time_upd_27012020.RData")#object "image_time"
-
-#in the image_time dataframe, make a column of tide levels from the tide prediction
-image_time$tidelevel<-approx(x=tide$Time, y=tide$z.m., xout=image_time$Imagetime)$y
-
-#Make a column of tide phase (I use the 'quick-and-dirty' approach, but we will come up with a better one, right?)
 library(data.table)
-tide$tide_next_point<-shift(tide$z.m., n=1, fill=NA, type="lead")
-image_time$tide_next_point<-approx(x=tide$Time, y=tide$tide_next_point, xout=image_time$Imagetime)$y
-
-# image_time$tide_phase<-NA
-# image_time$tide_phase[image_time$tide_next_point-image_time$tidelevel>0]<-"flow"
-# image_time$tide_phase[image_time$tide_next_point-image_time$tidelevel<0]<-"ebbb"
-# image_time$tide_phase[image_time$tide_next_point-image_time$tidelevel==0]<-"extremum"
+library(SpaDES)
+library(parallel)
+library(snow)
+library(rgdal)
+source("edit_tables.R")
+source('split_raster.R')
+source('cross_gam_function_ER_1.R')
 
 #Because cross_gam does not use extremums, I assign extremums to ebbb 
-image_time$tide_phase<-ifelse(image_time$tide_next_point>image_time$tidelevel,"flow","ebbb")
+metadata_images_table$tide_phase<-ifelse(metadata_images_table$tide_next_point > metadata_images_table$z.m.,"flow","ebb")
 
 #remove NAs
-image_time<-image_time[!is.na(image_time$tidelevel),]
+metadata_images_table<-metadata_images_table[!is.na(metadata_images_table$z.m.),]
+
 #define maximal tide level for the data, and recalculate tide levels into meters to maximum
-Max_tide<-max(image_time$tidelevel)
-image_time$meters_to_max<-Max_tide-image_time$tidelevel
+metadata_images_table$meters_to_max <- max(metadata_images_table$z.m.)-metadata_images_table$z.m.
 
 #give tide levels at flow negative values
-image_time$meters_to_max[image_time$tide_phase=='flow']<- -image_time$meters_to_max[image_time$tide_phase=='flow']
+metadata_images_table$meters_to_max[metadata_images_table$tide_phase=='flow']<- -metadata_images_table$meters_to_max[metadata_images_table$tide_phase=='flow']
 
-#load your raster brick
-brk<-brick('brk_29_01_2020.grd')
+#create a brick
+brk_tiff <- do.call(brick, lapply(metadata_tiff_table, raster))
+writeRaster(brk_tiff, 'brk_tiff.grd', overwrite=TRUE)
 
-#this is how to calculate Ebb part. Repeat the same for Flow
-Ebb<-calc(brk, fun=function(x) cross_gam_wrapper(x, image_time$meters_to_max, mode=c('ebbb')))
-#writeRaster(Ebb1,filename="ebbb1.grd",overwrite=TRUE)
+#create brick files for ebb and flood
+meters<-as.numeric(metadata_images_table$meters_to_max)
+beginCluster(4)
+cl <- getCluster()  
+clusterExport(cl, "meters")
 
-Res1<-Ebb1
-#remove pixels that are never (water) or always (land) exposed 
-Res1[Res1>=99]<-NA
-Res1[Res1<=-99]<-NA
-#par(mfrow=c(1,2))
-image(Res1, col=topo.colors(128))
+#the calc function itterates through a brickfile by itself, so the forloop was not necessary. 
+#This also helps improve the running time
+brk_ebb <- calc(brk_tiff, fun=function(x){ parApply(cl, x, 1, cross_gam_wrapper_par_ebb)} )
+brk_flood <- calc(brk_tiff, fun=function(x){ parApply(cl, x, 1, cross_gam_wrapper_par_flow)} )
 
-hist(Res1)
+#split the brickfiles of flood and ebb into seperate images
+tiles_Ebb <- splitRaster(brk_Ebb, nx=5, ny=5, )
+tiles_Flood <- splitRaster(brk_Flood, nx=5, ny=5, )
+
+#tests
+plot(tiles_Ebb[[1]])
+plot(tiles_Ebb[[4]])
+
+tt <- tiles_Ebb[[4]]
+values(tt)
