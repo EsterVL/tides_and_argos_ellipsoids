@@ -32,28 +32,48 @@ metadata_images_table$meters_to_max[metadata_images_table$tide_phase=='flow']<- 
 brk_tiff <- do.call(brick, lapply(metadata_tiff_table, raster))
 writeRaster(brk_tiff, 'brk_tiff.grd', overwrite=TRUE)
 
-#create brick files for ebb and flood
+#doing something with the meters to max collumn
 meters<-as.numeric(metadata_images_table$meters_to_max)
-beginCluster(4)
+beginCluster(10)
 cl <- getCluster()  
 clusterExport(cl, "meters")
 
-#the calc function itterates through a brickfile by itself, so the forloop was not necessary. 
-#This also helps improve the running time
-brk_ebb <- calc(brk_tiff, fun=function(x){ parApply(cl, x, 1, cross_gam_wrapper_par_ebb)} )
-writeRaster(brk_ebb, 'brk_ebb.grd', overwrite=TRUE)
-brk_flood <- calc(brk_tiff, fun=function(x){ parApply(cl, x, 1, cross_gam_wrapper_par_flow)} )
-writeRaster(brk_flood, 'brk_flood.grd', overwrite=TRUE)
+#the brickfile is split into different images
+tiles<-splitRaster(brk_tiff, nx=5, ny=5, )
 
-#split the brickfiles of flood and ebb into seperate images
-tiles_Ebb <- splitRaster(brk_ebb, nx=5, ny=5, )
-tiles_Flood <- splitRaster(brk_flood, nx=5, ny=5, )
+ResE<-c()
+ResF<-c()
 
-#tests
-par(mfrow = c(2,3))
-plot(tiles_Ebb[[1]], main = 'tiles_Ebb[1]')
-plot(tiles_Ebb[[2]], main = 'tiles_Ebb[2]')
-plot(tiles_Ebb[[3]], main = 'tiles_Ebb[3]')
-plot(tiles_Ebb[[4]], main = 'tiles_Ebb[4]')
-plot(tiles_Ebb[[5]], main = 'tiles_Ebb[5]')
-plot(tiles_Ebb[[6]], main = 'tiles_Ebb[6]')
+#rasterfiles are created for the ebb and flow images
+for (i in 1:length(tiles)) {
+  cat(i, 'Ebb \n')
+  Res_cur_E <- calc(tiles[[i]], fun=function(x){ parApply(cl, x, 1, cross_gam_wrapper_par_ebb)} )
+  plot(Res_cur_E)
+  ResE<-c(ResE, Res_cur_E)
+  cat(i, 'Flow \n')
+  Res_cur_F <- calc(tiles[[i]], fun=function(x){ parApply(cl, x, 1, cross_gam_wrapper_par_flow)} )
+  plot(Res_cur_F)
+  ResF<-c(ResF, Res_cur_F)
+}
+endCluster()
+
+#create an ebb brick that can determine if a bird is on always land or always water
+Ebb_raw <- do.call(merge, ResE)
+writeRaster(Ebb_raw, 'Ebb_raw_Oman.grd')
+
+#create an ebb brick that can determine if a bird is on sometimes land or sometimes water
+Ebb_tides <- Ebb_raw
+Ebb_tides[Ebb_tides<(-90)] <- NA
+Ebb_tides[Ebb_tides>(90)] <- NA
+writeRaster(Ebb_tides, 'Ebb_tides_Oman.grd')
+
+#create an flood brick that can determine if a bird is on always land or always water
+Flood_raw <- do.call(merge, ResF)
+writeRaster(Flood_raw, 'Flood_raw_Oman.grd')
+
+#create an flood brick that can determine if a bird is on sometimes land or sometimes water
+Flood_tides <- Flood_raw
+Flood_tides[Flood_tides<(-90)] <- NA
+Flood_tides[Flood_tides>(90)] <- NA
+writeRaster(Flood_tides, 'Flood_tides_Oman.grd')
+
