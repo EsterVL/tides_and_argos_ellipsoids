@@ -46,10 +46,9 @@ for (var i = 0; i < n; i++){
   .max()
   .clip(polygon)
   .normalizedDifference(['B3', 'B8'])
-  .lt(0.3)
   var ndwi = ee.Image(edit_image)
   //the image is added to the map as a black and white type of image
-  Map.addLayer(ndwi.updateMask(ndwi), {}, name, false)
+  Map.addLayer(ndwi, {}, name, false)
   //the image is exported to google drive.
   if (true) {
     Export.image.toDrive({ 
