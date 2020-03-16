@@ -61,19 +61,7 @@ endCluster()
 Ebb_raw <- do.call(merge, ResE)
 writeRaster(Ebb_raw, 'Ebb_raw_Oman.grd')
 
-#create an ebb brick that can determine if a bird is on sometimes land or sometimes water
-Ebb_tides <- Ebb_raw
-Ebb_tides[Ebb_tides<(-90)] <- NA
-Ebb_tides[Ebb_tides>(90)] <- NA
-writeRaster(Ebb_tides, 'Ebb_tides_Oman.grd')
-
 #create an flood brick that can determine if a bird is on always land or always water
 Flood_raw <- do.call(merge, ResF)
 writeRaster(Flood_raw, 'Flood_raw_Oman.grd')
-
-#create an flood brick that can determine if a bird is on sometimes land or sometimes water
-Flood_tides <- Flood_raw
-Flood_tides[Flood_tides<(-90)] <- NA
-Flood_tides[Flood_tides>(90)] <- NA
-writeRaster(Flood_tides, 'Flood_tides_Oman.grd')
 
