@@ -1,0 +1,67 @@
+//The map is centered on the area we want to study and the satelite bands are selected
+var polygon = ee.Geometry.Rectangle(58.57, 20.59, 58.79, 20.8);
+var bands = ['B8','B3'];
+Map.centerObject(polygon);
+
+//the imagecollection we want to use is downloaded and filtered on the bands,
+//the polygon, the date and cloudpercentage. The cloudpercentage is based upon the
+//originial selected images and the highest cloudy pixel percentage.
+//Also, the date is retrieved, reformatted and added to the picture.
+//this is done twice in different formats, so it can be used in the name of the
+//picture later on and to select images later on.
+var Image_collection = ee.ImageCollection('COPERNICUS/S2_SR')
+  .select(bands)
+  .filterBounds(polygon)
+  .filterDate('2016-01-01','2020-01-01')
+  .filterMetadata('CLOUDY_PIXEL_PERCENTAGE','less_than',13.9)
+  .map(function(img) {
+    var date_name = img.date().format('YYYY-MM-dd hh-mm-ss')
+    return img.set('date_name', date_name)
+  })
+  .map(function(img) {
+    var date = img.date().format('YYYYMMdd')
+    return img.set('date', date)
+  });
+
+//The image collection and both date-formats are reformed into a list type object.
+//The size of list date_names is determined to know the size of the forloop later on.
+var listOfImages = Image_collection.toList(Image_collection.size());
+var date_names = ee.List(Image_collection.aggregate_array('date_name'));
+var dates = ee.List(Image_collection.aggregate_array('date'));
+var n = date_names.size().getInfo();
+
+//The forloop uses the size of date_names to loop through all the images.
+for (var i = 0; i < n; i++){
+  //The specific item in both date-lists and the image list are retrieved
+  var date_name = date_names.get(i)
+  var date = dates.get(i)
+  var image = listOfImages.get(i)
+  //the date is reformatted so it can be used to select images
+  var cur_date = ee.Date.parse('YYYYMMdd', date)
+  //the name of the image is created with the number of the image and the time and date.
+  var name = 'local_tidal_level_'+ i +'_'+ date_name.getInfo()
+  //The image we need is filtered out of the imagecollection and changed into an image type.
+  var edit_image = Image_collection
+  .filterDate(cur_date, cur_date.advance(1, 'day'))
+  .max()
+  .clip(polygon)
+  .normalizedDifference(['B3', 'B8'])
+  .lt(0.3)
+  var ndwi = ee.Image(edit_image)
+  //the image is added to the map as a black and white type of image
+  Map.addLayer(ndwi.updateMask(ndwi), {}, name, false)
+  //the image is exported to google drive.
+  if (true) {
+    Export.image.toDrive({ 
+      image: ndwi,
+      description: name,
+      fileNamePrefix: name,
+      scale: 10,
+      region:ee.Geometry.Rectangle(58.57, 20.59, 58.79, 20.8),
+      fileFormat: 'GeoTIFF',
+      maxPixels:600000000
+      });
+    }
+}
+
+
