@@ -30,12 +30,12 @@ Flow_birds_table$tiff_value <- extract(Flood_raw, Flow_birds[,c(1,2)], cellnumbe
 
 #For both the Ebb birds table and the Flow birds table, we determine if a bird is on land or in the water
 #by comparing their tiff value to their meters to max value. 
-#if an Ebb bird has a lower tiff value compared to their meters to max value, it is on water. 
-#if an Ebb bird has a higher tiff value compared to their meters to max value, it is on land. 
-#if an Flow bird has a higher tiff value compared to their meters to max value, it is on water. 
-#if an Flow bird has a lower tiff value compared to their meters to max value, it is on land. 
-Ebb_birds_table$enviroment<-ifelse(Ebb_birds_table$tiff_value < Ebb_birds_table$meters_to_max ,"water", ifelse(Ebb_birds_table$tiff_value > Ebb_birds_table$meters_to_max ,"land", NA))
-Flow_birds_table$enviroment<-ifelse(Flow_birds_table$tiff_value > Flow_birds_table$meters_to_max ,"water", ifelse(Flow_birds_table$tiff_value < Flow_birds_table$meters_to_max ,"land", NA))
+#if an Ebb bird has a higher tiff value compared to their meters to max value, it is on water. 
+#if an Ebb bird has a lower tiff value compared to their meters to max value, it is on land. 
+#if an Flow bird has a lower tiff value compared to their meters to max value, it is on water. 
+#if an Flow bird has a higher tiff value compared to their meters to max value, it is on land. 
+Ebb_birds_table$enviroment<-ifelse(Ebb_birds_table$tiff_value > Ebb_birds_table$meters_to_max ,"water", ifelse(Ebb_birds_table$tiff_value > Ebb_birds_table$meters_to_max ,"land", NA))
+Flow_birds_table$enviroment<-ifelse(Flow_birds_table$tiff_value < Flow_birds_table$meters_to_max ,"water", ifelse(Flow_birds_table$tiff_value < Flow_birds_table$meters_to_max ,"land", NA))
 
 #all birds with NA's in the tiff_value collumn will be removed, because they are not in the designated area
 Ebb_birds_table <- Ebb_birds_table[!is.na(Ebb_birds_table$tiff_value),]
