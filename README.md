@@ -14,3 +14,5 @@ this repository the current model
 
 ## 3. Model_bship.R
 This script will load all the packages and scrips necessary.
+
+
