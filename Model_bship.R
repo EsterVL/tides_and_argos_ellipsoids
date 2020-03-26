@@ -36,7 +36,12 @@ source("merge_tables.R")
 #source("create_brickfiles.R")
 #if brickfiles already exist, use this code to save time:
 Flood_raw<-brick('Flood_raw_Oman.grd')
+Flood_raw[Flood_raw>=99]<-NA
+Flood_raw[Flood_raw<=-99]<-NA
+
 Ebb_raw<-brick('Ebb_raw_Oman.grd')
+Ebb_raw[Ebb_raw>=99]<-NA
+Ebb_raw[Ebb_raw<=-99]<-NA
 
 #This script creates two new tables. One table with the information about the birds that are present during ebb
 #and one table with the information about the birds that are present during flood. Both tables also have an
