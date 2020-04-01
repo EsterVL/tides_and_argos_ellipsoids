@@ -1,5 +1,9 @@
+#This script is called upon by the script "Model_Bship.R"
+
 ##Give the tides_table_2011 a timestamp
 tides_table_2011$timestamp <- paste(tides_table_2011$mm.dd.yyyy, tides_table_2011$hh.mm.ss, sep = ' ')
+tides_table_2011 <- tides_table_2011[order(tides_table_2011$time),]
+
 tides_table_2011$timestamp <- as.POSIXct(strptime(tides_table_2011$time, format='%m.%d.%Y %H:%M', tz = 'UTC'), format='%Y-%m-%d %H:%M:%S')
 ##get a meters to max and tide phase in tides_table 2011
 tides_table_2011$meters_to_max <- as.numeric(max(tides_table$z.m.) - tides_table_2011$z.m.)
@@ -8,100 +12,102 @@ tides_table_2011$tide_phase<-ifelse(tide_next_point > tides_table_2011$z.m.,"flo
 tides_table_2011<-tides_table_2011[!is.na(tides_table_2011$tide_phase),]
 tides_table_2011$meters_to_max[tides_table_2011$tide_phase=='flow']<- -tides_table_2011$meters_to_max[tides_table_2011$tide_phase=='flow']
 
+##empty data.frame in which data will be written  
+calData <- data.frame()
 
-
-check_stations <- function(name_station){
+##This function loops through the different stations.
+for(item in checkpoints){
   ##Get the table and the number of the station
-  checkpoint <- read.csv(name_station)
-  number <- as.numeric(gsub("\\D", "", name_station))
-
+  checkpoint <- read.csv(item)
+  number <- as.numeric(gsub("\\D", "", item))
+  
+  ##delete first and last measurement, this might be false measurement, i.e. 
+  ##if gauge was not installed yet
+  checkpoint <- checkpoint[-1,]
+  checkpoint <- checkpoint[-(nrow(checkpoint)),]
+  
   ##editing the time of the checkpoint and give timestamps to checkpoint table
-  dateTimeOman <- as.POSIXct(checkpoint[, c(1)], format='%d %m %y %H:%M', tz = 'Asia/Dubai')
-  checkpoint$timestamp <- as.POSIXct(format(dateTimeOman,tz="UTC"), format='%Y-%m-%d %H:%M:%S')
+  checkpoint$dateTimeOman <- as.POSIXct(checkpoint[, c(1)], format='%d %m %y %H:%M', tz = 'Asia/Dubai')
+  checkpoint$timestamp <- as.POSIXct(format(checkpoint$dateTimeOman,tz="UTC"), format='%Y-%m-%d %H:%M:%S')
+  
+  ##for some reason the time was different in this file:
+  if(number == 509){
+    ##editing the time of the checkpoint and give timestamps to checkpoint table
+    checkpoint$dateTimeOman <- as.POSIXct(checkpoint[, c(1)], format='%m %d %y %H:%M', tz = 'Asia/Dubai')
+    checkpoint$timestamp <- as.POSIXct(format(checkpoint$dateTimeOman,tz="UTC"), format='%Y-%m-%d %H:%M:%S')
+  }
+  
+  ##creating temporary location table to convert to spatialpointsdataframe
+  spdf <- loc
   
   ##Give the measuring instrument a location stamp and determine the ebb and flood value
-  loc.sp <- SpatialPointsDataFrame(data.frame(loc$X[which(loc$ID == number)], loc$Y[which(loc$ID == number)]), data.frame(loc[which(loc$ID == number), ]))
-  proj4string(loc.sp)=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
-  flood_value <- as.numeric(extract(Flood_raw,loc.sp[,c(1,2)], cellnumbers=F))
-  ebb_value <- as.numeric(extract(Ebb_raw,loc.sp[,c(1,2)], cellnumbers=F))
+  spdf <- SpatialPointsDataFrame(data.frame(spdf$X[which(spdf$ID == number)], spdf$Y[which(spdf$ID == number)]), data.frame(spdf[which(spdf$ID == number), ]))
+  proj4string(spdf)=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+  flood_value <- as.numeric(extract(Flood_raw,spdf[,c(1,2)], cellnumbers=F))
+  ebb_value <- as.numeric(extract(Ebb_raw,spdf[,c(1,2)], cellnumbers=F))
   
-  ##if model thinks the measuring instrument is in water or on land, return NA, else, check the accuracy.
-  if(ebb_value == 99 && flood_value == 99){
-    return(NA)
-  }
-  else if(ebb_value == -99 && flood_value == -99){
-    return(NA)
-  }
-  else{
-    ##merge the checkpoint table and the subsection of the tides table to gather all the data in one table
-    df <- merge(x=checkpoint, y=tides_table_2011, by="timestamp", all.X=T, sort=F)
-    ##Give the df table a checkpoint enviroment collumn. This is based on the waterdepht. 
-    ##If waterdepth = 0, enviroment = "land", else it is "water
-    df$c_enviroment<-ifelse(df[, c(3)] == 0,"land","water")
-    
-    ##give the df table a model enviroment collumn. This is based on meters to max
-    ##if ebb:
-    ##if meters to max > ebb value: water
-    ##if meters to max < ebb value: land
-    ##if flood:
-    ##if meters to max > flood value: land
-    ##if meters to max < flood value: water
-    df$m_enviroment<-ifelse(df$meters_to_max>ebb_value | df$meters_to_max<flood_value, "land","water")
-    
-    ##add the next time period to the table and create difference between ebb and flood. 
-    difference_enviroment <- df[which(df$c_enviroment != df$m_enviroment), ]
-    difference_enviroment$next_time<-shift(difference_enviroment$timestamp, n=1, fill=NA, type="lead")
-    difference_enviroment<-difference_enviroment[!is.na(difference_enviroment$next_time),]
-    difference_enviroment$label <- difference_enviroment$timestamp-difference_enviroment$next_time
-    difference_enviroment$label[difference_enviroment$tide_phase=="flow"] <- -difference_enviroment$label[difference_enviroment$tide_phase=="flow"]
-    
-    ##Get the time differences of the measuring instrument and the model
-    x <- 10
-    y <- 10
-    ebb_list <- c()
-    flood_list <-c()
-    for (item in difference_enviroment$label) {
-      if(item != 10 && item == abs(item)){
-        ebb_list <- c(ebb_list, x)
-        x <- 10
+  ##only continue if the position was within the extend of the model
+  if (!is.na(ebb_value)){
+    ##for some reason I get a positive ebb value at one location, don't know what to do with it, so skip
+    if (ebb_value > 0){
+      ##set m_environment in the tides table to NA, this will be filled later (but it remembers it because of the loop)
+      tides_table_2011$m_enviroment <- NA
+      
+      ##merge the checkpoint table and the subsection of the tides table to gather all the data in one table
+      df <- merge(x=checkpoint, y=tides_table_2011, by="timestamp", all.X=T, sort=F)
+      
+      ##Give the df table a checkpoint enviroment collumn. This is based on the waterdepth. 
+      ##If waterdepth = 0, enviroment = "land", else it is "water
+      df$c_enviroment<-ifelse(df[, c(3)] == 0,"land","water")
+      
+      ##give the df table a model enviroment collumn. This is based on meters to max
+      ##if ebb:
+      ##if meters to max > ebb value: water
+      ##if meters to max < ebb value: land
+      ##if flood:
+      ##if meters to max > flood value: land
+      ##if meters to max < flood value: water
+      
+      ##identify for each minute if the location at the gauge is in our out of the water according
+      ## to the model
+      tides_table_2011$m_enviroment <- ifelse(tides_table_2011$meters_to_max>ebb_value | tides_table_2011$meters_to_max<flood_value, "land","water")
+      
+      ##identify the moment at which there is a change between water and land and vice versa in the gauge data
+      changeTimeMeasured <- df$timestamp[which(df$c_enviroment[c(1:(nrow(df)-1))] != df$c_enviroment[c(2:nrow(df))])] + 5*60
+      
+      ##identify the moment at which there is a change between water and land and vice versa according to the model
+      changeTimeModel <- tides_table_2011$timestamp[which(tides_table_2011$m_enviroment[c(1:(nrow(tides_table_2011)-1))] != tides_table_2011$m_enviroment[c(2:nrow(tides_table_2011))])] #+ 0.5*60
+      
+      ##identify for each measured changepoint when the nearest modelled changepoint is 
+      ##empty dataframe that will be filled in a for loop 
+      myDiffTime <- data.frame()
+      for(j in 1 : length(changeTimeMeasured)){
+        myDiffTime <- rbind(myDiffTime,
+                            difftime(changeTimeMeasured[j], 
+                                     changeTimeModel[which.min(abs(changeTimeModel - changeTimeMeasured[j]))], units = "mins"))
       }
-      if(item == 10){
-        x <- x + 10
-      }
-      if(item != -10 && item != abs(item)){
-        flood_list <- c(flood_list, y)
-        y <- 10
-      }
-      if(item == -10){
-        y <- y + 10
-      }
-    }
-    ebb_list <- c(ebb_list, x)
-    flood_list <- c(flood_list, y)
-    total_list <- c(ebb_list, -flood_list)
-    return(total_list)
-  }
-}
+      ##some bookkeeping
+      names(myDiffTime) <- 'DiffTime'
+      ##ebb or flood
+      tidePhase <- df$tide_phase[which(df$c_enviroment[c(1:(nrow(df)-1))] != df$c_enviroment[c(2:nrow(df))])]
 
-df <- lapply(checkpoints, check_stations)
+      ttt <-data.frame(diffTime = c(myDiffTime),
+                       tidePhase = tidePhase,
+                       station = number)
 
-time_ebb <- c()
-time_flood <- c()
-for (list in df){
-  if(!is.na(list)){
-    for(item in list){
-      if (item == abs(item)){
-        time_ebb <- c(time_ebb, item)
-      }
-      else{
-        time_flood <- c(time_flood, item)
-      }
+      calData <- rbind(calData, ttt)
     }
   }
 }
 
-par(mfrow=c(1,2))
-boxplot(time_ebb, main = "ebb")
-boxplot(abs(time_flood), main = "flood")
+boxplot(as.numeric(calData$DiffTime) ~ calData$tidePhase,
+        ylab = 'time difference (mins)',
+        xlab = 'tide phase')
+
+
+
+
+
+
 
 
