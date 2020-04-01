@@ -1,3 +1,5 @@
+#This script is called upon by the script "Model_Bship.R"
+
 ##this script will merge all the useful information from the tides table to the birdlocation and the
 ##metadata image table
 
