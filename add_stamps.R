@@ -1,3 +1,5 @@
+#This script is called upon by the script "Model_Bship.R"
+
 ##this script gives all the tables a propper timestamp and locationstamp
 
 #Give all tables a propper timestamp
