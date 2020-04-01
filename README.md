@@ -9,9 +9,6 @@ this repository the current model
 (Images for Oman are available here: https://drive.google.com/open?id=199452hRBv5jTSt6qZB5gRLqXLlhc0Fpk )
 - Walk through the images and delete all the unclear images and all the images with blank areas.
 
-## 2. create_table_datetime.sh
-- Run this bash script to create a table with the date and time of all the images.
-
 ## 3. Model_bship.R
 This script will load all the packages and scrips necessary.
 
