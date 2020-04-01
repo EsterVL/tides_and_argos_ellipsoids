@@ -1,3 +1,5 @@
+#This script is called upon by the script "Model_Bship.R"
+
 #This script adds an extra collumn to the birdlocation table and tells if a bird is on land or in the water.
 
 #split the bird location table in an abb table and a flood table
