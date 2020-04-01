@@ -1,3 +1,5 @@
+#This script is called upon by the script "Model_Bship.R"
+
 ##this script edits tides_table so all the usefull information will available.
 ##the script will return the tides table with the columns: 
 ##lat, lon, timestamp, z.m., tide_phase and meters_to_max
